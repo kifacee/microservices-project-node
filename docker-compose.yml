@@ -1,0 +1,52 @@
+services:
+  app:
+    build:
+      context: .
+    image: nodeapp
+    ports:
+      - "80:8080"
+    environment:
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_DATABASE}
+      DB_HOST: ${DB_HOST}
+      NODE_ENV: ${NODE_ENV}
+    networks:
+      - pgnodeapp
+    volumes:
+    # this is a bind mount. it copies the current directory (where the .yml file is)
+    # over into the container at /app.
+    # this means changes to local files will immediately
+    # be reflected inside the container without having to rebuild
+    # using COPY would mean we would have to rebuild whenever we change local code.
+    # so this is good for development
+      - .:/app
+    depends_on:
+      - db
+    command: sh -c './wait-for.sh db:5432 -- npm run build-start'
+
+  db:
+    image: postgres:12-alpine
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    networks:
+      pgnodeapp:
+        aliases:
+          - "postgres"
+    volumes:
+      - postgres-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+networks:
+  pgnodeapp:
+    driver: bridge
+
+volumes:
+  postgres-db:
